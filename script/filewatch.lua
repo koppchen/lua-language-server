@@ -32,21 +32,16 @@ local m = {}
 m._eventList = {}
 m._watchings = {}
 
----@param path string
----@param recursive boolean
-function m.watch(path, recursive)
+function m.watch(path)
     if path == '' then
         return function () end
     end
     if m._watchings[path] then
         m._watchings[path].count = m._watchings[path].count + 1
     else
-        local watch = fw.create()
-        watch:add(path)
-        watch:recursive(recursive)
         m._watchings[path] = {
             count = 1,
-            watch = watch,
+            id    = fw.add(path),
         }
         log.debug('fw.add', path)
     end
@@ -58,6 +53,7 @@ function m.watch(path, recursive)
         removed = true
         m._watchings[path].count = m._watchings[path].count - 1
         if m._watchings[path].count == 0 then
+            fw.remove(m._watchings[path].id)
             m._watchings[path] = nil
             log.debug('fw.remove', path)
         end
@@ -79,22 +75,19 @@ end
 
 function m.update()
     local collect
-    for _, watching in pairs(m._watchings) do
-        local watch = watching.watch
-        for _ = 1, 10000 do
-            local ev, path = watch:select()
-            if not ev then
-                break
-            end
-            log.debug('filewatch:', ev, path)
-            if not collect then
-                collect = {}
-            end
-            if ev == 'modify' then
-                collect[path] = (collect[path] or 0) | MODIFY
-            elseif ev == 'rename' then
-                collect[path] = (collect[path] or 0) | RENAME
-            end
+    for _ = 1, 10000 do
+        local ev, path = fw.select()
+        if not ev then
+            break
+        end
+        log.debug('filewatch:', ev, path)
+        if not collect then
+            collect = {}
+        end
+        if ev == 'modify' then
+            collect[path] = (collect[path] or 0) | MODIFY
+        elseif ev == 'rename' then
+            collect[path] = (collect[path] or 0) | RENAME
         end
     end
 
